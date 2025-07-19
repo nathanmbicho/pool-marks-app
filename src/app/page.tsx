@@ -1,14 +1,55 @@
 "use client"
 
 import React, { useState, useEffect } from 'react';
-import { Plus, Minus, Users, Trophy, Clock, DollarSign, History, Play, Square, Check, Edit3, Save, X } from 'lucide-react';
+import { Plus, Minus, Users, Trophy, Clock, DollarSign, History, Play, Square, Check, Edit3, X } from 'lucide-react';
+
+interface CarryForwardType {
+  player: string;
+  amount: number;
+}
+
+interface GameResultType {
+  winner: string;
+  paidPlayers: string[];
+  carryForwards: CarryForwardType[];
+}
+
+interface GameType {
+  gameNumber: number;
+  players: string[];
+  stake: number;
+  startTime: string;
+  endTime?: string;
+  winner?: string;
+  paidPlayers?: string[];
+  carryForwards?: CarryForwardType[];
+  fees?: {
+    chalk: number;
+    table: number;
+  };
+}
+
+interface SessionType {
+  id: string;
+  startTime: string;
+  games: GameType[];
+  players: Array<{
+    name: string;
+    balance: number;
+    totalWins: number;
+    totalLosses: number;
+  }>;
+  currentStake: number;
+  chalkFee: number;
+  tableFee: number;
+}
 
 const PoolMarksApp = () => {
-  const [sessions, setSessions] = useState([]);
-  const [currentSession, setCurrentSession] = useState(null);
+  const [sessions, setSessions] = useState<SessionType[]>([]);
+  const [currentSession, setCurrentSession] = useState<SessionType | null>(null);
   const [showNewSession, setShowNewSession] = useState(false);
   const [gameInProgress, setGameInProgress] = useState(false);
-  const [currentGame, setCurrentGame] = useState(null);
+  const [currentGame, setCurrentGame] = useState<GameType | null>(null);
   const [showGameResult, setShowGameResult] = useState(false);
   const [editingBalances, setEditingBalances] = useState(false);
 
@@ -21,7 +62,7 @@ const PoolMarksApp = () => {
   });
 
   // Game Result Form
-  const [gameResult, setGameResult] = useState({
+  const [gameResult, setGameResult] = useState<GameResultType>({
     winner: '',
     paidPlayers: [],
     carryForwards: []
@@ -45,7 +86,7 @@ const PoolMarksApp = () => {
       return;
     }
 
-    const session = {
+    const session: SessionType = {
       id: `Session_${sessions.length + 1}`,
       startTime: new Date().toLocaleString(),
       games: [],
@@ -99,6 +140,10 @@ const PoolMarksApp = () => {
       return;
     }
 
+    if (!currentSession || !currentGame) {
+      return;
+    }
+
     const totalFees = currentSession.chalkFee + currentSession.tableFee;
     const winnerPayout = (currentSession.players.length * currentSession.currentStake) - totalFees;
 
@@ -107,7 +152,7 @@ const PoolMarksApp = () => {
 
     // Update player balances
     const updatedPlayers = currentSession.players.map(player => {
-      const newPlayer = { ...player };
+      const newPlayer = {...player};
 
       if (player.name === gameResult.winner) {
         // Winner gets payout minus carry forwards minus fees
@@ -140,8 +185,8 @@ const PoolMarksApp = () => {
       return newPlayer;
     });
 
-    // Create game record
-    const gameRecord = {
+    // create a game record
+    const gameRecord: GameType = {
       gameNumber: currentGame.gameNumber,
       players: currentGame.players,
       stake: currentSession.currentStake,
@@ -154,7 +199,7 @@ const PoolMarksApp = () => {
     };
 
     // Update session
-    const updatedSession = {
+    const updatedSession: SessionType = {
       ...currentSession,
       players: updatedPlayers,
       games: [...currentSession.games, gameRecord]
@@ -162,7 +207,7 @@ const PoolMarksApp = () => {
 
     // Update sessions array
     const updatedSessions = sessions.map(s =>
-      s.id === currentSession.id ? updatedSession : s
+        s.id === currentSession.id ? updatedSession : s
     );
 
     setSessions(updatedSessions);
@@ -171,17 +216,24 @@ const PoolMarksApp = () => {
     setCurrentGame(null);
   };
 
-  const updateSessionSettings = (field, value) => {
+  const updateSessionSettings = <K extends keyof SessionType>(
+      field: K,
+      value: SessionType[K]
+  ) => {
+    if (!currentSession) return;
+
     const updatedSession = { ...currentSession, [field]: value };
     setCurrentSession(updatedSession);
 
     const updatedSessions = sessions.map(s =>
-      s.id === currentSession.id ? updatedSession : s
+        s.id === currentSession.id ? updatedSession : s
     );
     setSessions(updatedSessions);
   };
 
   const addPlayer = () => {
+    if (!currentSession) return;
+
     const playerName = prompt('Enter new player name:');
     if (playerName && playerName.trim()) {
       const newPlayer = {
@@ -191,34 +243,36 @@ const PoolMarksApp = () => {
         totalLosses: 0
       };
 
-      const updatedSession = {
+      const updatedSession: SessionType = {
         ...currentSession,
         players: [...currentSession.players, newPlayer]
       };
 
       setCurrentSession(updatedSession);
       const updatedSessions = sessions.map(s =>
-        s.id === currentSession.id ? updatedSession : s
+          s.id === currentSession.id ? updatedSession : s
       );
       setSessions(updatedSessions);
     }
   };
 
-  const removePlayer = (playerName) => {
+  const removePlayer = (playerName: string) => {
+    if (!currentSession) return;
+
     if (currentSession.players.length <= 2) {
       alert('Need at least 2 players in session');
       return;
     }
 
     if (confirm(`Remove ${playerName} from session?`)) {
-      const updatedSession = {
+      const updatedSession: SessionType = {
         ...currentSession,
         players: currentSession.players.filter(p => p.name !== playerName)
       };
 
       setCurrentSession(updatedSession);
       const updatedSessions = sessions.map(s =>
-        s.id === currentSession.id ? updatedSession : s
+          s.id === currentSession.id ? updatedSession : s
       );
       setSessions(updatedSessions);
     }
@@ -323,6 +377,7 @@ const PoolMarksApp = () => {
 
             <div className="space-y-6">
               {/* Winner Selection */}
+              {currentSession && (
               <div>
                 <label className="block text-lg font-semibold text-slate-300 mb-3">Who Won?</label>
                 <div className="grid grid-cols-2 gap-3">
@@ -343,8 +398,10 @@ const PoolMarksApp = () => {
                   ))}
                 </div>
               </div>
+              )}
 
               {/* Payment Status */}
+              {currentSession && (
               <div>
                 <label className="block text-lg font-semibold text-slate-300 mb-3">Who Paid Immediately? (Losers Only)</label>
                 <div className="grid grid-cols-2 gap-3">
@@ -379,7 +436,10 @@ const PoolMarksApp = () => {
                 </div>
               </div>
 
+              )}
+
               {/* Carry Forwards */}
+              {currentSession && (
               <div>
                 <label className="block text-lg font-semibold text-slate-300 mb-3">Carry Forward (Optional)</label>
                 <div className="space-y-3">
@@ -414,6 +474,7 @@ const PoolMarksApp = () => {
                   })}
                 </div>
               </div>
+              )}
 
               <div className="flex gap-3 pt-6">
                 <button
@@ -580,9 +641,10 @@ const PoolMarksApp = () => {
                     className="w-full bg-amber-600 hover:bg-amber-700 text-white font-bold py-3 px-4 rounded-lg transition-all flex items-center justify-center gap-2"
                   >
                     <Square className="w-5 h-5" />
-                    End Game {currentGame.gameNumber}
+                    End Game {currentGame ? currentGame.gameNumber : ''}
                   </button>
                 )}
+
               </div>
 
               <div className="pt-2 space-y-2">
@@ -691,13 +753,13 @@ const PoolMarksApp = () => {
                       <span className="text-slate-400">Stake: </span>
                       <span className="text-white">{game.stake} KES</span>
                     </div>
-                    {game.paidPlayers.length > 0 && (
+                    {game.paidPlayers && game.paidPlayers.length > 0 && (
                       <div>
                         <span className="text-slate-400">Paid: </span>
                         <span className="text-green-400">{game.paidPlayers.join(', ')}</span>
                       </div>
                     )}
-                    {game.carryForwards.length > 0 && (
+                    {game.carryForwards && game.carryForwards.length > 0 && (
                       <div>
                         <span className="text-slate-400">Carried: </span>
                         <span className="text-blue-400">
@@ -741,7 +803,11 @@ const PoolMarksApp = () => {
 
             <div className="text-center">
               <div className="text-3xl font-bold text-amber-400">
-                {currentSession.games.reduce((sum, game) => sum + game.fees.chalk + game.fees.table, 0)} KES
+                {currentSession.games.reduce((sum, game) => {
+                  const chalkFee = game.fees?.chalk ?? 0;
+                  const tableFee = game.fees?.table ?? 0;
+                  return sum + chalkFee + tableFee;
+                }, 0)} KES
               </div>
               <div className="text-slate-400">Total Fees</div>
             </div>
