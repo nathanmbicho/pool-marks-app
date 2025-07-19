@@ -794,14 +794,14 @@ const PoolMarksApp = () => {
               <div className="text-slate-400">Total Games</div>
             </div>
 
-            <div className="text-center">
+            <div className="text-center hidden">
               <div className="text-3xl font-bold text-blue-400">
                 {currentSession.games.reduce((sum, game) => sum + (game.stake * game.players.length), 0)} KES
               </div>
               <div className="text-slate-400">Total Pot</div>
             </div>
 
-            <div className="text-center">
+            <div className="text-center hidden">
               <div className="text-3xl font-bold text-amber-400">
                 {currentSession.games.reduce((sum, game) => {
                   const chalkFee = game.fees?.chalk ?? 0;
