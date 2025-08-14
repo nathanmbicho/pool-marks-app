@@ -172,6 +172,7 @@ const PoolMarksApp = () => {
           // Player was carried forward - their previous stake moves to the next game
           // No balance change - debt stays the same amount as carry forward
           // The carry forward amount will be their stake for the next game
+          newPlayer.balance -= currentSession.currentStake - carryForward.amount;
         } else if (!paidImmediately) {
           // Player didn't pay and wasn't carried forward - add debt
           newPlayer.balance -= currentSession.currentStake;
@@ -395,7 +396,7 @@ const PoolMarksApp = () => {
               {/* Winner Selection */}
               {currentSession && (
               <div>
-                <label className="block text-lg font-semibold text-slate-300 mb-3">Who Won?</label>
+                <label className="block text-lg font-semibold text-slate-300 mb-3">Winner</label>
                 <div className="grid grid-cols-2 gap-3">
                   {currentSession.players.map(player => (
                     <button
@@ -419,9 +420,9 @@ const PoolMarksApp = () => {
               {/* Payment Status */}
               {currentSession && (
               <div>
-                <label className="block text-lg font-semibold text-slate-300 mb-3">Who Paid Immediately? (Losers Only)</label>
+                <label className="block text-lg font-semibold text-slate-300 mb-3">Paid Players</label>
                 <div className="grid grid-cols-2 gap-3">
-                  {currentSession.players.filter(p => p.name !== gameResult.winner).map(player => (
+                  {currentSession.players.map(player => (
                     <button
                       key={player.name}
                       onClick={() => {
@@ -784,7 +785,7 @@ const PoolMarksApp = () => {
                     </div>
                     <div>
                       <span className="text-slate-400">ChalkMan Fee: </span>
-                      <span className="text-white">{game.stake} KES</span>
+                      <span className="text-white">{game.fees?.chalk + game.fees?.table} KES</span>
                     </div>
                     {game.paidPlayers && game.paidPlayers.length > 0 && (
                       <div>
