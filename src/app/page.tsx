@@ -523,7 +523,7 @@ const PoolMarksApp = () => {
             <div className="inline-flex items-center gap-3 bg-slate-800 rounded-2xl px-6 py-4 mb-6 shadow-xl border border-slate-700">
               <h1 className="text-4xl font-bold text-white">🎱 Pool Tracker 🎱</h1>
             </div>
-            <p className="text-slate-400 text-lg">Manage your pool table game sessions and player balances</p>
+            <p className="text-slate-400 text-lg">Created by Ras 🎉; inspired by Stayner Morara</p>
           </div>
 
           {/* New Session Button */}
