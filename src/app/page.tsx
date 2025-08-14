@@ -1,7 +1,7 @@
 "use client"
 
-import React, { useState, useEffect } from 'react';
-import { Plus, Minus, Users, Trophy, Clock, DollarSign, History, Play, Square, Check, Edit3, X } from 'lucide-react';
+import React, {useEffect, useState} from 'react';
+import {Check, Clock, DollarSign, Edit3, History, Minus, Play, Plus, Square, Trophy, Users, X} from 'lucide-react';
 
 interface CarryForwardType {
   player: string;
@@ -145,39 +145,38 @@ const PoolMarksApp = () => {
     }
 
     const totalFees = currentSession.chalkFee + currentSession.tableFee;
-    const winnerPayout = (currentSession.players.length * currentSession.currentStake) - totalFees;
+    const totalPlayers = currentSession.players.length;
 
-    // Calculate carry forward total
-    const totalCarryForward = gameResult.carryForwards.reduce((sum, cf) => sum + cf.amount, 0);
+    // Winner always gets (total players × stake) - fees
+    const winnerPayout = (totalPlayers * currentSession.currentStake) - totalFees;
 
     // Update player balances
     const updatedPlayers = currentSession.players.map(player => {
       const newPlayer = {...player};
 
       if (player.name === gameResult.winner) {
-        // Winner gets payout minus carry forwards minus fees
-        newPlayer.balance += winnerPayout - totalCarryForward;
+        // Winner gets full payout
+        newPlayer.balance += winnerPayout;
         newPlayer.totalWins += 1;
 
-        // Winner pays fees
-        newPlayer.balance -= totalFees;
+        // If the winner hadn't paid for this game, deduct stake from winnings
+        if (!gameResult.paidPlayers.includes(player.name)) {
+          newPlayer.balance -= currentSession.currentStake;
+        }
       } else {
-        // Check if this loser was carried forward
+        // For losing players
         const carryForward = gameResult.carryForwards.find(cf => cf.player === player.name);
-        const carriedAmount = carryForward ? carryForward.amount : 0;
-
-        // Check if this loser paid immediately
         const paidImmediately = gameResult.paidPlayers.includes(player.name);
 
-        if (carriedAmount > 0) {
-          // Player was carried forward - add credit
-          newPlayer.balance += carriedAmount;
+        if (carryForward) {
+          // Player was carried forward - their previous stake moves to the next game
+          // No balance change - debt stays the same amount as carry forward
+          // The carry forward amount will be their stake for the next game
+        } else if (!paidImmediately) {
+          // Player didn't pay and wasn't carried forward - add debt
+          newPlayer.balance -= currentSession.currentStake;
         }
-
-        if (!paidImmediately && carriedAmount < currentSession.currentStake) {
-          // Player didn't pay and wasn't fully carried forward - add debt
-          newPlayer.balance -= (currentSession.currentStake - carriedAmount);
-        }
+        // If the player paid immediately, no balance change needed
 
         newPlayer.totalLosses += 1;
       }
@@ -185,7 +184,7 @@ const PoolMarksApp = () => {
       return newPlayer;
     });
 
-    // create a game record
+    // Create a game record
     const gameRecord: GameType = {
       gameNumber: currentGame.gameNumber,
       players: currentGame.players,
@@ -276,6 +275,23 @@ const PoolMarksApp = () => {
       );
       setSessions(updatedSessions);
     }
+  };
+
+  const updatePlayerBalance = (playerName: string, newBalance: number) => {
+    if (!currentSession) return;
+
+    const updatedSession: SessionType = {
+      ...currentSession,
+      players: currentSession.players.map(p =>
+          p.name === playerName ? { ...p, balance: newBalance } : p
+      )
+    };
+
+    setCurrentSession(updatedSession);
+    const updatedSessions = sessions.map(s =>
+        s.id === currentSession.id ? updatedSession : s
+    );
+    setSessions(updatedSessions);
   };
 
   if (showNewSession) {
@@ -504,10 +520,7 @@ const PoolMarksApp = () => {
           {/* Header */}
           <div className="text-center mb-12">
             <div className="inline-flex items-center gap-3 bg-slate-800 rounded-2xl px-6 py-4 mb-6 shadow-xl border border-slate-700">
-              <div className="p-2 bg-emerald-500 rounded-xl">
-                <Trophy className="w-8 h-8 text-white" />
-              </div>
-              <h1 className="text-4xl font-bold text-white">Stayner 🎱 Tracker</h1>
+              <h1 className="text-4xl font-bold text-white">🎱 Pool Tracker 🎱</h1>
             </div>
             <p className="text-slate-400 text-lg">Manage your pool table game sessions and player balances</p>
           </div>
@@ -746,11 +759,31 @@ const PoolMarksApp = () => {
 
                   <div className="space-y-1 text-sm">
                     <div>
-                      <span className="text-slate-400">Winner: </span>
-                      <span className="text-emerald-400 font-semibold">{game.winner}</span>
+                      <span className="text-slate-400">All Players: </span>
+                      <span className="text-gray-300 font-semibold">{game.players.join(', ')}</span>
                     </div>
                     <div>
-                      <span className="text-slate-400">Stake: </span>
+                      <span className="text-slate-400">Winner: </span>
+                      <span className="text-emerald-400 font-semibold">{game.winner} - {
+                        (() => {
+                          if (!game.players.length || !game.stake || !game.fees || !game.winner) return 'N/A';
+
+                          // Total pot minus fees
+                          const totalPayout = (game.players.length * game.stake) - (game.fees.chalk + game.fees.table);
+
+                          // Subtract carry forwards winner paid
+                          const totalCarryForwards = game.carryForwards?.reduce((sum, cf) => sum + cf.amount, 0) || 0;
+
+                          // Subtract stake if the winner hadn't paid
+                          const winnerPaid = game.paidPlayers?.includes(game.winner) || false;
+                          const stakeDeduction = winnerPaid ? 0 : game.stake;
+
+                          return totalPayout - totalCarryForwards - stakeDeduction;
+                        })()
+                      }</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400">ChalkMan Fee: </span>
                       <span className="text-white">{game.stake} KES</span>
                     </div>
                     {game.paidPlayers && game.paidPlayers.length > 0 && (
@@ -791,64 +824,92 @@ const PoolMarksApp = () => {
               <div className="text-3xl font-bold text-emerald-400">
                 {currentSession.games.length}
               </div>
-              <div className="text-slate-400">Total Games</div>
+              <div className="text-slate-400">Games Played</div>
             </div>
 
-            <div className="text-center hidden">
-              <div className="text-3xl font-bold text-blue-400">
-                {currentSession.games.reduce((sum, game) => sum + (game.stake * game.players.length), 0)} KES
-              </div>
-              <div className="text-slate-400">Total Pot</div>
-            </div>
-
-            <div className="text-center hidden">
+            <div className="text-center">
               <div className="text-3xl font-bold text-amber-400">
-                {currentSession.games.reduce((sum, game) => {
-                  const chalkFee = game.fees?.chalk ?? 0;
-                  const tableFee = game.fees?.table ?? 0;
-                  return sum + chalkFee + tableFee;
-                }, 0)} KES
+                {currentSession.chalkFee + currentSession.tableFee} KES
               </div>
-              <div className="text-slate-400">Total Fees</div>
+              <div className="text-slate-400">Chalk Man Fees</div>
             </div>
 
             <div className="text-center">
               <div className="text-3xl font-bold text-purple-400">
-                {currentSession.players.reduce((sum, player) => sum + Math.abs(player.balance), 0)} KES
+                {currentSession.currentStake} KES
               </div>
-              <div className="text-slate-400">Outstanding</div>
+              <div className="text-slate-400">Current Stake</div>
             </div>
           </div>
 
           {/* Balance Summary */}
           <div className="mt-6 pt-6 border-t border-slate-700">
             <h3 className="text-lg font-semibold text-white mb-4">Balance Summary</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <h4 className="text-emerald-400 font-semibold mb-2">Credits (To Receive)</h4>
-                {currentSession.players.filter(p => p.balance > 0).map(player => (
-                  <div key={player.name} className="flex justify-between py-1">
-                    <span className="text-slate-300">{player.name}</span>
-                    <span className="text-emerald-400 font-semibold">+{player.balance} KES</span>
-                  </div>
-                ))}
-                {currentSession.players.filter(p => p.balance > 0).length === 0 && (
-                  <div className="text-slate-500 italic">No outstanding credits</div>
-                )}
-              </div>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                <tr className="border-b border-gray-200">
+                  <th className="text-left py-3 px-2">Player</th>
+                  <th className="text-center py-3 px-2">Balance</th>
+                  <th className="text-center py-3 px-2">Wins</th>
+                  <th className="text-center py-3 px-2">Losses</th>
+                  <th className="text-center py-3 px-2">Actions</th>
+                </tr>
+                </thead>
+                <tbody>
+                {currentSession.players.map(player => {
+                  // Calculate current balance including ongoing game
+                  let currentBalance = player.balance;
 
-              <div>
-                <h4 className="text-red-400 font-semibold mb-2">Debts (To Pay)</h4>
-                {currentSession.players.filter(p => p.balance < 0).map(player => (
-                  <div key={player.name} className="flex justify-between py-1">
-                    <span className="text-slate-300">{player.name}</span>
-                    <span className="text-red-400 font-semibold">{player.balance} KES</span>
-                  </div>
-                ))}
-                {currentSession.players.filter(p => p.balance < 0).length === 0 && (
-                  <div className="text-slate-500 italic">No outstanding debts</div>
-                )}
-              </div>
+                  if (gameInProgress && currentGame) {
+                    // If there's a game in progress, the player owes the stake (unless they've already paid or are carried forward)
+                    // This shows what their balance would be if they lose and don't pay
+                    currentBalance = player.balance - currentSession.currentStake;
+                  }
+
+                  return (
+                      <tr key={player.name} className="border-b border-gray-100">
+                        <td className="py-3 px-2 font-medium">
+                          {player.name}
+                          {gameInProgress && <span className="ml-2 text-xs text-blue-600">(in game)</span>}
+                        </td>
+                        <td className="py-3 px-2 text-center">
+                          {editingBalances ? (
+                              <input
+                                  type="number"
+                                  value={player.balance}
+                                  onChange={(e) => updatePlayerBalance(player.name, Number(e.target.value))}
+                                  className="w-20 p-1 border border-gray-300 rounded text-center text-sm"
+                              />
+                          ) : (
+                              <div>
+                              <span className={player.balance >= 0 ? 'text-green-600' : 'text-red-600'}>
+                                {player.balance >= 0 ? '+' : ''}{player.balance}
+                              </span>
+                                {gameInProgress && (
+                                    <div className="text-xs text-gray-500">
+                                      (→ {currentBalance >= 0 ? '+' : ''}{currentBalance})
+                                    </div>
+                                )}
+                              </div>
+                          )}
+                        </td>
+                        <td className="py-3 px-2 text-center text-green-600">{player.totalWins}</td>
+                        <td className="py-3 px-2 text-center text-red-600">{player.totalLosses}</td>
+                        <td className="py-3 px-2 text-center">
+                          <button
+                              onClick={() => removePlayer(player.name)}
+                              className="text-red-500 hover:text-red-700 text-sm"
+                              disabled={gameInProgress}
+                          >
+                            Remove
+                          </button>
+                        </td>
+                      </tr>
+                  );
+                })}
+                </tbody>
+              </table>
             </div>
           </div>
         </div>
