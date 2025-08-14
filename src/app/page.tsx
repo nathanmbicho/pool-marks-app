@@ -785,7 +785,9 @@ const PoolMarksApp = () => {
                     </div>
                     <div>
                       <span className="text-slate-400">ChalkMan Fee: </span>
-                      <span className="text-white">{game.fees?.chalk + game.fees?.table} KES</span>
+                      { game.fees && game.fees.table >= 0 && game.fees.chalk >= 0 && (
+                        <span className="text-white">{game.fees?.chalk + game.fees?.table} KES</span>
+                    )}
                     </div>
                     {game.paidPlayers && game.paidPlayers.length > 0 && (
                       <div>
